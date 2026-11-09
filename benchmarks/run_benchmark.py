@@ -137,17 +137,19 @@ def write_csv(rows: list[dict], path: str | Path) -> None:
         writer = csv.writer(f)
         writer.writerow(CSV_HEADER)
         for r in rows:
-            writer.writerow([
-                r["model"],
-                r["n"],
-                round(r["accuracy"]["mean"], 4),
-                round(r["grounded"]["mean"], 4),
-                round(r["faithful"]["mean"], 4),
-                round(r["robust"]["mean"], 4),
-                round(r["trustworthy"]["mean"], 4),
-                round(r["ece"]["mean"], 4),
-                round(r["latency"]["mean"], 4),
-            ])
+            writer.writerow(
+                [
+                    r["model"],
+                    r["n"],
+                    round(r["accuracy"]["mean"], 4),
+                    round(r["grounded"]["mean"], 4),
+                    round(r["faithful"]["mean"], 4),
+                    round(r["robust"]["mean"], 4),
+                    round(r["trustworthy"]["mean"], 4),
+                    round(r["ece"]["mean"], 4),
+                    round(r["latency"]["mean"], 4),
+                ]
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -165,9 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         help="instruction style (default plain); try few-shot to test whether "
         "verbatim-quoting examples recover a model's grounding",
     )
-    parser.add_argument(
-        "--csv", metavar="PATH", help="write benchmark results to CSV at PATH"
-    )
+    parser.add_argument("--csv", metavar="PATH", help="write benchmark results to CSV at PATH")
     args = parser.parse_args(argv)
 
     if args.runs < 1:
