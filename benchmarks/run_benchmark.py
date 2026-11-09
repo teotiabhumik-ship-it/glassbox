@@ -15,13 +15,16 @@ Usage:
     python benchmarks/run_benchmark.py --models qwen2.5:3b,qwen2.5:7b
     python benchmarks/run_benchmark.py --models qwen2.5:7b --runs 5
     python benchmarks/run_benchmark.py --models qwen2.5:3b --corpus benchmarks/corpus.jsonl
+    python benchmarks/run_benchmark.py --models qwen2.5:3b --csv results.csv
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import time
 from dataclasses import replace
+from pathlib import Path
 from statistics import mean
 
 from glassbox.backends import OllamaBackend
@@ -33,6 +36,17 @@ from glassbox.prompts import DEFAULT_POLICY, PROMPT_STYLES
 # table (it's machine noise, not model non-determinism).
 RATE_METRICS = ("accuracy", "grounded", "faithful", "robust", "trustworthy")
 SCORE_METRICS = ("ece",)
+CSV_HEADER = (
+    "model",
+    "n",
+    "accuracy",
+    "grounded",
+    "faithful",
+    "robust",
+    "trustworthy",
+    "ece",
+    "latency",
+)
 
 
 def benchmark(model: str, corpus: str, host: str, prompt_style: str = "plain") -> dict:
@@ -115,6 +129,27 @@ def to_spread_markdown(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def write_csv(rows: list[dict], path: str | Path) -> None:
+    """Write mean benchmark rows to *path* in CSV format."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(CSV_HEADER)
+        for r in rows:
+            writer.writerow([
+                r["model"],
+                r["n"],
+                round(r["accuracy"]["mean"], 4),
+                round(r["grounded"]["mean"], 4),
+                round(r["faithful"]["mean"], 4),
+                round(r["robust"]["mean"], 4),
+                round(r["trustworthy"]["mean"], 4),
+                round(r["ece"]["mean"], 4),
+                round(r["latency"]["mean"], 4),
+            ])
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Benchmark glassbox across models (Ollama).")
     parser.add_argument("--models", required=True, help="comma-separated Ollama model tags")
@@ -129,6 +164,9 @@ def main(argv: list[str] | None = None) -> int:
         default="plain",
         help="instruction style (default plain); try few-shot to test whether "
         "verbatim-quoting examples recover a model's grounding",
+    )
+    parser.add_argument(
+        "--csv", metavar="PATH", help="write benchmark results to CSV at PATH"
     )
     args = parser.parse_args(argv)
 
@@ -149,6 +187,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.runs > 1:
         print()
         print(to_spread_markdown(rows))
+
+    if args.csv:
+        write_csv(rows, args.csv)
+
     return 0
 
 

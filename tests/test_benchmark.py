@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import csv
 import importlib.util
 from pathlib import Path
 
@@ -79,3 +80,49 @@ def test_spread_table_reports_the_range():
     assert "Spread across 2 runs" in spread
     assert "60%-100%" in spread  # grounded varied run to run
     assert "0.20-0.30" in spread  # ece
+
+
+def test_write_csv_outputs_expected_header_and_rows(tmp_path: Path):
+    agg = rb.aggregate(
+        [
+            _run("m1", accuracy=0.9, grounded=1.0, ece=0.2, latency=10.0),
+            _run("m1", accuracy=0.8, grounded=0.8, ece=0.3, latency=12.0),
+        ]
+    )
+    csv_file = tmp_path / "results.csv"
+    rb.write_csv([agg], csv_file)
+
+    assert csv_file.exists()
+    with open(csv_file, newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+
+    assert rows[0] == list(rb.CSV_HEADER)
+    assert rows[0] == [
+        "model",
+        "n",
+        "accuracy",
+        "grounded",
+        "faithful",
+        "robust",
+        "trustworthy",
+        "ece",
+        "latency",
+    ]
+    assert rows[1] == ["m1", "3", "0.85", "0.9", "1.0", "1.0", "1.0", "0.25", "11.0"]
+
+
+def test_main_with_csv_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    csv_file = tmp_path / "benchmarks" / "out.csv"
+    dummy_run = _run("mock-model", accuracy=0.95, grounded=0.9, latency=2.5)
+    monkeypatch.setattr(rb, "benchmark", lambda *args, **kwargs: dummy_run)
+
+    exit_code = rb.main(["--models", "mock-model", "--csv", str(csv_file)])
+    assert exit_code == 0
+    assert csv_file.exists()
+
+    with open(csv_file, newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+
+    assert rows[0] == list(rb.CSV_HEADER)
+    assert rows[1][0] == "mock-model"
+    assert rows[1][2] == "0.95"
